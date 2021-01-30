@@ -16,6 +16,13 @@ enum E_OP
     OP_ZERO_OR_MORE = '*'
 };
 
+// 状态类型
+enum E_STATE_TYPE
+{
+    STATE_SPLIT = 256,
+    STATE_MATCH = 257
+};
+
 // 获取运算符优先级
 int getOpPriority(int op);
 // 比较运算符优先级
@@ -23,6 +30,59 @@ int getOpPriority(int op);
 // < 0: lhs < rhs
 // = 0: lhs = rhs
 int compareOpPriority(int lhs, int rhs);
+
+// 状态
+struct State
+{
+    int c;  // < 256: ASCII =256: Split 257: matchState
+    State* out;
+    State* out1;
+    int lastlist;
+
+    State(int _c, State* _out, State* _out1):
+        c(_c), out(_out), out1(_out1)
+    { }
+};
+
+// 片段
+struct Frag
+{
+    State* start;
+    std::vector<State**> out;
+
+    Frag(State* _start = NULL):
+        start(_start)
+    { }
+
+    Frag(State* _start, State** _outp):
+        start(_start)
+    {
+        out.push_back(_outp);
+    }
+
+    void patch(Frag* other)
+    {
+        for (auto& pp : out)
+            *pp = other->start;
+    }
+
+    void patch(State* other)
+    {
+        for (auto& pp : out)
+            *pp = other;
+    }
+
+    void append(Frag* other)
+    {
+        for (auto& i : other->out)
+            out.push_back(i);
+    }
+
+    void append(State** other)
+    {
+        out.push_back(other);
+    }
+};
 
 class RegExp
 {
@@ -47,9 +107,13 @@ private:
     std::string re2post(const std::string& rule);
     // 判断某个字符是否为操作符
     bool isOp(char s);
+    // 生成NFA
+    Frag* post2nfa(const std::string& post);
 
 private:
     std::string _rule;
+    std::string _post;
+    Frag* _nfa;
 };
 
 #endif // __REGEXP_HPP__

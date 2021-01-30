@@ -54,9 +54,10 @@ RegExp::~RegExp()
 void RegExp::setRule(const std::string& rule)
 {
     _rule = rule;
-    std::string postfix = re2post(rule);
-    printf("origin: %s\n", rule.c_str());
-    printf("postfix: %s\n", postfix.c_str());
+    _post = re2post(rule);
+    printf("origin: %s\n", _rule.c_str());
+    printf("postfix: %s\n", _post.c_str());
+    _nfa = post2nfa(_post);
 }
 
 // 获取正则表达式
@@ -140,15 +141,14 @@ std::string RegExp::re2post(const std::string& rule)
         ops.pop();
     }
 
-    printf("size: %d\n", operands.size());
+    // printf("size: %d\n", operands.size());
     ret.resize(operands.size());
-    for (size_t i = ret.size() - 1; i > 0; i--)
+    size_t i = ret.size() - 1;
+    while (!operands.empty())
     {
-        ret[i] = operands.top();
-        // printf("ret[%d] = %c\n", i, ret[i]);
+        ret[i--] = operands.top();
         operands.pop();
     }
-    ret[0] = operands.top();
 
     return ret;
 }
@@ -157,4 +157,92 @@ std::string RegExp::re2post(const std::string& rule)
 bool RegExp::isOp(char s)
 {
     return (s == OP_LPAREN || s == OP_RPAREN || s == OP_ALTER || s == OP_CONCAT || s == OP_ONE_OR_MORE || s == OP_ZERO_OR_MORE || s == OP_ZERO_OR_ONE);
+}
+
+// 生成NFA
+Frag* RegExp::post2nfa(const std::string& post)
+{
+    Frag* ret = new Frag;
+    stack<Frag*> frag_stack;
+
+    for (const char& c : post)
+    {
+        printf("%c\n", c);
+        switch(c)
+        {
+            case OP_CONCAT:
+            {
+                Frag* e2 = frag_stack.top();
+                frag_stack.pop();
+                Frag* e1 = frag_stack.top();
+                frag_stack.pop();
+                e1->patch(e2);
+                frag_stack.push(e1);
+                break;
+            }
+
+            case OP_ALTER:
+            {
+                Frag* e2 = frag_stack.top();
+                frag_stack.pop();
+                Frag* e1 = frag_stack.top();
+                frag_stack.pop();
+
+                State* s = new State(STATE_SPLIT, e1->start, e2->start);
+                Frag* f = new Frag(s);
+                f->append(e1);
+                f->append(e2);
+                break;
+            }
+                
+            case OP_ZERO_OR_ONE:
+            {
+                Frag* e1 = frag_stack.top();
+                frag_stack.pop();
+                State* s = new State(STATE_SPLIT, e1->start, NULL);
+                Frag* f = new Frag(s);
+                f->append(e1);
+                f->append(&s->out1);
+                break;
+            }
+
+            case OP_ZERO_OR_MORE:
+            {
+                Frag* e1 = frag_stack.top();
+                frag_stack.pop();
+                State* s = new State(STATE_SPLIT, e1->start, NULL);
+                e1->patch(s);
+                Frag* f = new Frag(s, &s->out1);
+                frag_stack.push(f);
+                break;
+            }
+                
+            case OP_ONE_OR_MORE:
+            {
+                Frag* e1 = frag_stack.top();
+                frag_stack.pop();
+                State* s = new State(STATE_SPLIT, e1->start, NULL);
+                e1->patch(s);
+                Frag* f = new Frag(e1->start, &s->out1);
+                frag_stack.push(f);
+                break;
+            }
+
+            default:
+            {
+                State* s = new State(c, NULL, NULL);
+                Frag* f = new Frag(s, &s->out);
+                frag_stack.push(f);
+                break;
+            }
+        }
+    }
+    
+    if (!frag_stack.empty())
+    {
+        ret->start = frag_stack.top()->start;
+        ret->out = frag_stack.top()->out;
+    }
+        
+    return ret;
 }
