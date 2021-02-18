@@ -67,10 +67,81 @@ std::string RegExp::getRule(void)
 }
 
 // 匹配，返回匹配到的字符串
-// std::vector<std::string> RegExp::match(const char *expression)
-// {
-//     return match(expression);
-// }
+bool RegExp::match(const char *expression)
+{
+    return match(std::string(expression));
+}
+
+bool RegExp::match(const std::string& expression)
+{
+    return match_nfa(expression);
+}
+
+// 用NFA匹配
+bool RegExp::match_nfa(const std::string& expression)
+{   
+    printf("match nfa\n");
+    State* s = _nfa->start;
+    int i = 0;
+
+    if (expression.empty()) return false;
+
+    while (i < expression.size())
+    {
+        char exp_s = expression[i];
+        bool found = false;
+        if (s->c == STATE_SPLIT)
+        {
+            State* temp_s = s->out;
+            State* temp_s1 = s->out1;
+            printf("split\n");
+            printf("matching: %c and %c\n", exp_s, temp_s->c);
+            if (temp_s->c == exp_s)
+            {
+                s = temp_s;
+                found = true;
+            }
+
+            printf("matching: %c and %c\n", exp_s, temp_s1->c);
+            if (temp_s1 && temp_s1->c == exp_s)
+            {
+                s = temp_s1;
+                found = true;
+            }
+        }
+        else if (s->c == STATE_MATCH)
+        {
+            return false;
+        }
+        else
+        {
+            printf("matching: %c and %c\n", exp_s, s->c);
+            if (s->c == exp_s)
+            {
+                found = true;
+                s = s->out;
+            }
+        }
+
+        if (!found)
+        {
+            return false;
+        }
+        else
+        {
+            i++;
+        }
+    }
+
+    State* temp_s = s->out;
+    State* temp_s1 = s->out1;
+    if (s->c == STATE_MATCH || (temp_s && temp_s->c == STATE_MATCH) || (temp_s1 && temp_s1->c == STATE_MATCH))
+    {
+        return true;
+    }
+
+    return false;
+}
 
 // 中缀表达式转为后缀（逆波兰式）
 std::string RegExp::re2post(const std::string& rule)
@@ -167,7 +238,7 @@ Frag* RegExp::post2nfa(const std::string& post)
 
     for (const char& c : post)
     {
-        printf("%c\n", c);
+
         switch(c)
         {
             case OP_CONCAT:
@@ -192,6 +263,7 @@ Frag* RegExp::post2nfa(const std::string& post)
                 Frag* f = new Frag(s);
                 f->append(e1);
                 f->append(e2);
+                frag_stack.push(f);
                 break;
             }
                 
@@ -236,12 +308,17 @@ Frag* RegExp::post2nfa(const std::string& post)
                 break;
             }
         }
+
+        // printf("%c  %d\n", c, frag_stack.size());
     }
-    
+
     if (!frag_stack.empty())
     {
+        // printf("get ret\n");
         ret->start = frag_stack.top()->start;
         ret->out = frag_stack.top()->out;
+        State* s = new State(STATE_MATCH, NULL, NULL);
+        ret->patch(s);
     }
         
     return ret;

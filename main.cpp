@@ -3,7 +3,21 @@
 int main()
 {
     RegExp reg("(aa)+|(bb)*");
-    reg.setRule("(((((a)))))");
-    reg.setRule("(((((a)))))bc");
+
+    if (reg.match("aaaa"))
+    {
+        printf("match aaaa\n");
+    }
+
+    if (reg.match("aaa"))
+    {
+        printf("match aaa\n");
+    }
+    else
+    {
+        printf("not match aaa\n");
+    }
+    
+
     return 0;
 }

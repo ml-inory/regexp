@@ -99,8 +99,8 @@ public:
     std::string getRule(void);
 
     // 匹配，返回匹配到的字符串
-    // std::vector<std::string> match(const char *expression);
-    // std::vector<std::string> match(const std::string& expression);
+    bool match(const char *expression);
+    bool match(const std::string& expression);
 
 private:
     // 中缀表达式转为后缀（逆波兰式）
@@ -109,6 +109,9 @@ private:
     bool isOp(char s);
     // 生成NFA
     Frag* post2nfa(const std::string& post);
+    // 用NFA匹配
+    bool match_nfa(const std::string& expression);
+    
 
 private:
     std::string _rule;
